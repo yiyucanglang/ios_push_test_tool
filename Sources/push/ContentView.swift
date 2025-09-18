@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: PushViewModel
@@ -126,13 +125,8 @@ struct ContentView: View {
     private var logSection: some View {
         GroupBox("日志输出") {
             ZStack(alignment: .topTrailing) {
-                LogTextView(text: Binding(get: { viewModel.logOutput }, set: { _ in }))
+                LogTextView(text: viewModel.logOutput)
                     .frame(minHeight: 140)
-                    .background {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color(nsColor: .textBackgroundColor))
-                    }
-
                 Button("复制全部") {
                     viewModel.copyLogsToPasteboard()
                 }

@@ -14,13 +14,14 @@ struct APNsRequest {
 struct APNsResponse {
     let statusCode: Int
     let body: String
+    let apnsID: String?
 }
 
 enum APNsClientError: LocalizedError {
     case invalidURL
     case signingFailed(String)
     case badResponse
-    case response(statusCode: Int, body: String)
+    case response(statusCode: Int, reason: String?, apnsID: String?, body: String)
 
     var errorDescription: String? {
         switch self {
@@ -30,12 +31,18 @@ enum APNsClientError: LocalizedError {
             return "JWT 签名失败：\(reason)"
         case .badResponse:
             return "无法识别 APNs 返回"
-        case let .response(status, body):
-            if body.isEmpty {
-                return "APNs 返回状态码 \(status)"
-            } else {
-                return "APNs 返回状态码 \(status)：\(body)"
+        case let .response(status, reason, apnsID, body):
+            var components: [String] = ["APNs 返回状态码 \(status)"]
+            if let reason, !reason.isEmpty {
+                components.append("原因：\(reason)")
             }
+            if let apnsID, !apnsID.isEmpty {
+                components.append("APNs ID：\(apnsID)")
+            }
+            if !body.isEmpty {
+                components.append("返回体：\(body)")
+            }
+            return components.joined(separator: "，")
         }
     }
 }
@@ -72,12 +79,19 @@ struct APNsClient {
         }
 
         let bodyText = String(data: data, encoding: .utf8) ?? ""
+        let apnsID = httpResponse.value(forHTTPHeaderField: "apns-id")
+        let errorReason = APNsClient.decodeErrorReason(from: data)
 
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw APNsClientError.response(statusCode: httpResponse.statusCode, body: bodyText)
+            throw APNsClientError.response(
+                statusCode: httpResponse.statusCode,
+                reason: errorReason,
+                apnsID: apnsID,
+                body: bodyText
+            )
         }
 
-        return APNsResponse(statusCode: httpResponse.statusCode, body: bodyText)
+        return APNsResponse(statusCode: httpResponse.statusCode, body: bodyText, apnsID: apnsID)
     }
 }
 
@@ -113,6 +127,24 @@ private extension APNsClient {
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+private extension APNsClient {
+    struct APNSErrorPayload: Decodable {
+        let reason: String
+        let timestamp: String?
+    }
+
+    static func decodeErrorReason(from data: Data) -> String? {
+        guard !data.isEmpty else { return nil }
+
+        do {
+            let payload = try JSONDecoder().decode(APNSErrorPayload.self, from: data)
+            return payload.reason
+        } catch {
+            return nil
+        }
     }
 }
 

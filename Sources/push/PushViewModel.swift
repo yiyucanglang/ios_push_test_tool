@@ -119,6 +119,9 @@ final class PushViewModel: ObservableObject {
                     isSending = false
                     statusLine = "HTTP \(response.statusCode)"
                     appendLog("✅ 推送成功，状态码：\(response.statusCode)")
+                    if let apnsID = response.apnsID, !apnsID.isEmpty {
+                        appendLog("🪪 APNs ID：\(apnsID)")
+                    }
                     if !response.body.isEmpty {
                         appendLog("📥 返回：\(response.body)")
                     }
@@ -130,7 +133,8 @@ final class PushViewModel: ObservableObject {
                             status: .success,
                             statusCode: response.statusCode,
                             responseBody: response.body.isEmpty ? nil : response.body,
-                            errorDescription: nil
+                            errorDescription: nil,
+                            apnsID: response.apnsID
                         )
                     )
                 }
@@ -138,9 +142,16 @@ final class PushViewModel: ObservableObject {
                 await MainActor.run {
                     isSending = false
                     if let apnsError = error as? APNsClientError,
-                       case let .response(status, body) = apnsError {
+                       case let .response(status, reason, apnsID, body) = apnsError {
                         statusLine = "HTTP \(status)"
-                        appendLog("❌ 发送失败：HTTP \(status) - \(body.isEmpty ? "无返回体" : body)")
+                        let reasonText = reason?.isEmpty == false ? reason! : "未提供原因"
+                        appendLog("❌ 发送失败：HTTP \(status)，原因：\(reasonText)")
+                        if let apnsID, !apnsID.isEmpty {
+                            appendLog("🪪 APNs ID：\(apnsID)")
+                        }
+                        if !body.isEmpty {
+                            appendLog("📥 返回原文：\(body)")
+                        }
                         appendHistory(
                             SendRecord(
                                 timestamp: Date(),
@@ -149,7 +160,8 @@ final class PushViewModel: ObservableObject {
                                 status: .failure,
                                 statusCode: status,
                                 responseBody: body.isEmpty ? nil : body,
-                                errorDescription: nil
+                                errorDescription: reason,
+                                apnsID: apnsID
                             )
                         )
                     } else {
@@ -163,7 +175,8 @@ final class PushViewModel: ObservableObject {
                                 status: .failure,
                                 statusCode: nil,
                                 responseBody: nil,
-                                errorDescription: error.localizedDescription
+                                errorDescription: error.localizedDescription,
+                                apnsID: nil
                             )
                         )
                     }
@@ -288,6 +301,7 @@ struct SendRecord: Identifiable {
     let statusCode: Int?
     let responseBody: String?
     let errorDescription: String?
+    let apnsID: String?
 
     var statusDescription: String {
         switch status {
@@ -307,6 +321,9 @@ struct SendRecord: Identifiable {
             return "成功"
         case .failure:
             if let code = statusCode {
+                if let reason = errorDescription, !reason.isEmpty {
+                    return "HTTP \(code) · \(reason)"
+                }
                 return "HTTP \(code)"
             }
             return errorDescription ?? "失败"

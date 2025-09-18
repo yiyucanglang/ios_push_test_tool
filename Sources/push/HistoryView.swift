@@ -48,6 +48,17 @@ private struct HistoryRow: View {
             Text(record.detailedStatus)
                 .font(.subheadline)
 
+            if let apnsID = record.apnsID, !apnsID.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("APNs ID")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(apnsID)
+                        .font(.system(.footnote, design: .monospaced))
+                        .textSelection(.enabled)
+                }
+            }
+
             if let response = record.responseBody, !response.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("APNs 返回")

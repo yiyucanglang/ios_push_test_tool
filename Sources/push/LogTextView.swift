@@ -1,39 +1,56 @@
 import SwiftUI
-import AppKit
 
-struct LogTextView: NSViewRepresentable {
-    @Binding var text: String
+struct LogTextView: View {
+    let text: String
 
-    func makeNSView(context: Context) -> NSScrollView {
-        let textView = NSTextView()
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.drawsBackground = false
-        textView.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-        textView.textContainerInset = NSSize(width: 6, height: 8)
-        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        let scrollView = NSScrollView()
-        scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = true
-        scrollView.contentView.drawsBackground = false
-        scrollView.documentView = textView
-
-        context.coordinator.textView = textView
-
-        return scrollView
+    private enum Constants {
+        static let bottomAnchor = "log-bottom-anchor"
     }
 
-    func updateNSView(_ nsView: NSScrollView, context: Context) {
-        context.coordinator.textView?.string = text
-        context.coordinator.textView?.scrollToEndOfDocument(nil)
-    }
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    if text.isEmpty {
+                        Text("暂无日志")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(text)
+                            .font(.system(.footnote, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                            .transition(.opacity)
+                    }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
+                    Color.clear
+                        .frame(height: 0)
+                        .id(Constants.bottomAnchor)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+            }
+            .background(Color(nsColor: .textBackgroundColor))
+            .onChange(of: text) { _, newValue in
+                guard !newValue.isEmpty else { return }
+                DispatchQueue.main.async {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(Constants.bottomAnchor, anchor: .bottom)
+                    }
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.secondary.opacity(0.3))
+                .allowsHitTesting(false)
+        }
     }
+}
 
-    final class Coordinator {
-        weak var textView: NSTextView?
-    }
+#Preview {
+    LogTextView(text: "[09:45:12] 🚀 正在向 开发环境 发送推送…\n[09:45:13] ❌ 发送失败：HTTP 403，原因：InvalidProviderToken")
+        .frame(width: 480, height: 200)
 }
