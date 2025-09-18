@@ -25,7 +25,9 @@
 - Key ID。
 - Team ID。
 - App 的 Bundle ID（作为 APNs Topic）。
-- 要接收推送的设备 token。
+- 要接收推送的设备 token(deviceTokenString)。 (ps: func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+                                                   let tokenParts = deviceToken.map { String(format: "%02x", $0) }
+                                                   var deviceTokenString = tokenParts.joined() })
 - 推送环境（开发/生产）。
 
 确保 iOS 设备安装的构建与推送环境相匹配（开发证书对应 sandbox，App Store/Ad Hoc 对应 production）。
